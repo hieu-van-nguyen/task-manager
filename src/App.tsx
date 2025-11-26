@@ -1,24 +1,21 @@
 import React from 'react';
-import logo from './logo.svg';
 import './App.css';
+import { AuthWrapper } from './components/AuthWrapper';
+import { TaskList } from './components/TaskList';
+import { auth } from './firebase/config';
+import { useAuthState } from 'react-firebase-hooks/auth';
 
 function App() {
+  const [user] = useAuthState(auth);
+
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+      <h1>Manage Your Tasks</h1>
+      {/* AuthWrapper handles login/logout and provides the user context */}
+      <AuthWrapper>
+        {/* TaskList only renders if the user is logged in (handled by AuthWrapper) */}
+        {user ? <TaskList /> : <p>Please log in to manage your tasks.</p>}
+      </AuthWrapper>
     </div>
   );
 }
