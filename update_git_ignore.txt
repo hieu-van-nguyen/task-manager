@@ -1,0 +1,5 @@
+  After modifying .gitignore, Git's index might need a refresh to recognize the changes.
+  
+  git rm -r --cached .
+  git add .
+  git commit -m "Refresh Git cache"
