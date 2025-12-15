@@ -54,6 +54,16 @@ export const TaskList: React.FC = () => {
             const endTimestamp = endDate.getTime();
             taskList = taskList.filter(t => t.createdAt >= startTimestamp && t.createdAt <= endTimestamp);
         }
+        taskList.sort((a, b) => {
+          const dateA = new Date(a.createdAt);
+          const dateB = new Date(b.createdAt);
+          if (dateA < dateB) {
+            return 1;
+          } else if (dateA > dateB) {
+            return -1;
+          }
+          return 0;
+        });
         setTasks(taskList);
     } catch (err) {
         console.log(err);
