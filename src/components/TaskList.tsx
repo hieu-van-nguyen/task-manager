@@ -13,6 +13,7 @@ export const TaskList: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
   const [filterDate, setFilterDate] = useState('');
+  const [status, setStatus] = useState("");
   const userUID = user?.uid;
 
   const tasksRef = collection(db, 'tasks');
@@ -54,6 +55,9 @@ export const TaskList: React.FC = () => {
             const endTimestamp = endDate.getTime();
             taskList = taskList.filter(t => t.createdAt >= startTimestamp && t.createdAt <= endTimestamp);
         }
+        if (status) {
+          taskList = taskList.filter(t => t.status === status);
+        }
         taskList.sort((a, b) => {
           const dateA = new Date(a.createdAt);
           const dateB = new Date(b.createdAt);
@@ -74,7 +78,7 @@ export const TaskList: React.FC = () => {
 
   useEffect(() => {
     fetchTasks();
-  }, [filterDate]);
+  }, [filterDate, status]);
 
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,6 +152,21 @@ export const TaskList: React.FC = () => {
           }}
         />
         <button onClick={() => setFilterDate('')}>Clear Filter</button>
+      </div>
+      <div className="filter-container">
+        <label htmlFor="status-filter">Filter tasks by status:</label>
+        <select
+          id="status-select"
+          value={status}
+          onChange={(e) => {
+            setStatus(e.target.value)
+          }}
+        >
+          <option value="">All</option>
+          <option value="not started">not started</option>
+          <option value="started">started</option>
+          <option value="completed">completed</option>
+        </select>
       </div>
       <hr />
       
