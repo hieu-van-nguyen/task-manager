@@ -7,6 +7,7 @@ import { db, auth } from '../firebase/config';
 import { Task, TaskStatus } from '../types/Task';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { EditTaskModal } from './EditTaskModal';
+import { DataGrid } from '@mui/x-data-grid';
 
 export const TaskList: React.FC = () => {
   const [user] = useAuthState(auth);
@@ -15,6 +16,40 @@ export const TaskList: React.FC = () => {
   const [filterDate, setFilterDate] = useState('');
   const [status, setStatus] = useState("");
   const userUID = user?.uid;
+  const columns = [
+    {
+      field: 'title', headerName: 'Title', width: 400
+    },
+    {
+      field: 'status', headerName: 'Status', width: 90
+    },
+    {
+      field: 'update_status', headerName: 'Update Status', width: 110,
+      renderCell: (params:any) => {
+        return (
+          <select
+              value={params.row.status}
+              onChange={(e) => handleUpdateStatus(params.row, e.target.value as TaskStatus)}
+          >
+              <option value="not started">Not Started</option>
+              <option value="started">Started</option>
+              <option value="completed">Completed</option>
+          </select>
+        );
+      },
+    },
+    {
+      field: 'action', headerName: '', width: 250,
+      renderCell: (params:any) => {
+        return (
+          <div>
+            <button onClick={() => openEditModal(params.row)} className="edit-button">Edit</button>
+            <button onClick={() => handleDeleteTask(params.row.id)}>Delete</button>
+          </div>
+        );
+      },
+    }
+  ]
 
   const tasksRef = collection(db, 'tasks');
   const q = query(
@@ -171,27 +206,11 @@ export const TaskList: React.FC = () => {
       <hr />
       
       <h2>Your Tasks ({tasks?.length})</h2>
-      <div className="tasks-list">
-        {tasks?.map((task) => (
-          <div key={task.id} className={`task-item task-${task.status.replace(' ', '-')}`}>
-            <h3>{task.title}</h3>
-            <p>Status: <strong>{task.status}</strong></p>
-            <div className="task-actions">
-                <select
-                    value={task.status}
-                    onChange={(e) => handleUpdateStatus(task, e.target.value as TaskStatus)}
-                >
-                    <option value="not started">Not Started</option>
-                    <option value="started">Started</option>
-                    <option value="completed">Completed</option>
-                </select>
-                <button onClick={() => openEditModal(task)} className="edit-button">
-                    Edit
-                </button>
-                <button onClick={() => handleDeleteTask(task.id)}>Delete</button>
-            </div>
-          </div>
-        ))}
+      <div style={{height: "500px", width: "100%"}}>
+        <DataGrid
+          rows={tasks}
+          columns={columns}
+        />
       </div>
       {isModalOpen && taskToEdit && (
         <EditTaskModal 
