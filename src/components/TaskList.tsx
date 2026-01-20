@@ -8,6 +8,7 @@ import { Task, TaskStatus } from '../types/Task';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { EditTaskModal } from './EditTaskModal';
 import { DataGrid } from '@mui/x-data-grid';
+import { Typography } from '@mui/material';
 
 export const TaskList: React.FC = () => {
   const [user] = useAuthState(auth);
@@ -20,13 +21,13 @@ export const TaskList: React.FC = () => {
   const userUID = user?.uid;
   const columns = [
     {
-      field: 'category', headerName: 'Category', width: 100
+      field: 'category', headerName: 'Category', width: 110
     },
     {
-      field: 'title', headerName: 'Title', width: 400
+      field: 'title', headerName: 'Title', width: 500
     },
     {
-      field: 'status', headerName: 'Status', width: 90
+      field: 'status', headerName: 'Status', width: 110
     },
     {
       field: 'update_status', headerName: 'Update Status', width: 110,
@@ -44,12 +45,22 @@ export const TaskList: React.FC = () => {
       },
     },
     {
+      field: 'createdAt', headerName: 'Create Date', width: 200,
+      renderCell: (params:any) => {
+        return (
+          <>
+            {getDateFromTimestamp(params.row.createdAt)}
+          </>
+        );
+      },
+    },
+    {
       field: 'action', headerName: '', width: 250,
       renderCell: (params:any) => {
         return (
           <div>
             <button onClick={() => openEditModal(params.row)} className="edit-button">Edit</button>
-            <button onClick={() => handleDeleteTask(params.row.id)}>Delete</button>
+            <button style={{marginLeft: 20}} onClick={() => handleDeleteTask(params.row.id)}>Delete</button>
           </div>
         );
       },
@@ -166,6 +177,11 @@ export const TaskList: React.FC = () => {
     setTaskToEdit(null); // Clear the task being edited
     fetchTasks();
   };
+
+  const getDateFromTimestamp = (ts: number) => {
+    const date: Date = new Date(ts);
+    return date.toLocaleString();
+  }
 
   if (loading) return <div>Loading tasks...</div>;
   if (error) return <div>Error fetching tasks:</div>;
