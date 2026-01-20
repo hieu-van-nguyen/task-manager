@@ -9,4 +9,5 @@ export interface Task {
   status: TaskStatus;
   createdAt: number; // Timestamp
   userId: string; // To ensure users only see their tasks
+  category: string;
 }

@@ -14,9 +14,14 @@ export const TaskList: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
   const [filterDate, setFilterDate] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
   const [status, setStatus] = useState("");
+  const [category, setCategory] = useState("Personal");
   const userUID = user?.uid;
   const columns = [
+    {
+      field: 'category', headerName: 'Category', width: 100
+    },
     {
       field: 'title', headerName: 'Title', width: 400
     },
@@ -78,7 +83,8 @@ export const TaskList: React.FC = () => {
                 description: data.description,
                 status: data.status,
                 createdAt: data.createdAt, // Timestamp
-                userId: data.userId
+                userId: data.userId,
+                category: data.category && data.category.length > 0 ? data.category : 'Personal'
             };
         });
         taskList = taskList.filter(t => t.userId === userUID);
@@ -92,6 +98,9 @@ export const TaskList: React.FC = () => {
         }
         if (status) {
           taskList = taskList.filter(t => t.status === status);
+        }
+        if (filterCategory) {
+          taskList = taskList.filter(t => t.category === filterCategory);
         }
         taskList.sort((a, b) => {
           const dateA = new Date(a.createdAt);
@@ -113,7 +122,7 @@ export const TaskList: React.FC = () => {
 
   useEffect(() => {
     fetchTasks();
-  }, [filterDate, status]);
+  }, [filterDate, status, filterCategory]);
 
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,6 +134,7 @@ export const TaskList: React.FC = () => {
       status: 'not started' as TaskStatus,
       createdAt: Date.now(),
       userId: userUID,
+      category: category
     });
 
     setNewTaskTitle('');
@@ -164,17 +174,28 @@ export const TaskList: React.FC = () => {
     <div>
       <h2>Add New Task</h2>
       <form onSubmit={handleAddTask}>
-        <input
-          type="text"
-          value={newTaskTitle}
-          onChange={(e) => {
-            setNewTaskTitle(e.target.value)
-          }}
-          placeholder="Task title"
-        />
-        <button type="submit">Add Task</button>
+        <div  className="filter-container">
+          <input
+            type="text"
+            value={newTaskTitle}
+            onChange={(e) => {
+              setNewTaskTitle(e.target.value)
+            }}
+            placeholder="Task title"
+          />
+          <br />
+          <select 
+            name="task_category" 
+            id="task_category"
+            onChange={(e) => {
+              setCategory(e.target.value);
+            }}>
+            <option value="Personal">Personal</option>
+            <option value="Work">Work</option>
+          </select>
+           <button type="submit">Add Task</button>
+        </div>
       </form>
-
       <hr />
       <div className="filter-container">
         <label htmlFor="date-filter">Filter tasks created on:</label>
@@ -201,6 +222,21 @@ export const TaskList: React.FC = () => {
           <option value="not started">not started</option>
           <option value="started">started</option>
           <option value="completed">completed</option>
+        </select>
+      </div>
+      <hr />
+      <div className="filter-container">
+        <label htmlFor="status-filter">Filter tasks by category:</label>
+        <select
+          id="category-select"
+          value={filterCategory}
+          onChange={(e) => {
+            setFilterCategory(e.target.value)
+          }}
+        >
+          <option value="">All</option>
+          <option value="Personal">Personal</option>
+          <option value="Work">Work</option>
         </select>
       </div>
       <hr />
