@@ -8,7 +8,6 @@ import { Task, TaskStatus } from '../types/Task';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { EditTaskModal } from './EditTaskModal';
 import { DataGrid } from '@mui/x-data-grid';
-import { Typography } from '@mui/material';
 
 export const TaskList: React.FC = () => {
   const [user] = useAuthState(auth);
@@ -70,13 +69,9 @@ export const TaskList: React.FC = () => {
   const tasksRef = collection(db, 'tasks');
   const q = query(
     tasksRef, 
-    where('userId', '==', userUID), // Only fetch tasks for the logged-in user
-    orderBy('createdAt', 'desc')
+    where('userId', '==', userUID) // Only fetch tasks for the logged-in user
   );
 
-  /* const [tasks, loading, error] = useCollectionData<Task>(q, {
-    idField: 'id' 
-  }); */
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -85,7 +80,7 @@ export const TaskList: React.FC = () => {
   const fetchTasks = async () => {
     setLoading(true);
     try {
-        const querySnapshot = await getDocs(tasksRef);
+        const querySnapshot = await getDocs(q);
         let taskList: Task[] = querySnapshot.docs.map(doc => {
             const data = doc.data();
             return {
@@ -98,7 +93,6 @@ export const TaskList: React.FC = () => {
                 category: data.category && data.category.length > 0 ? data.category : 'Personal'
             };
         });
-        taskList = taskList.filter(t => t.userId === userUID);
         if (filterDate) {
             const startDate = new Date(filterDate);
             const endDate = new Date(startDate);
