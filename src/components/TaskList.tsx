@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useCollectionData } from 'react-firebase-hooks/firestore';
-import { collection, query, where, orderBy, addDoc, doc, updateDoc, deleteDoc, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, doc, updateDoc, deleteDoc, getDocs, Timestamp } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
 import { Task, TaskStatus } from '../types/Task';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -16,7 +16,6 @@ export const TaskList: React.FC = () => {
   const [filterDate, setFilterDate] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [status, setStatus] = useState("");
-  const [category, setCategory] = useState("Personal");
   const userUID = user?.uid;
   const columns = [
     {
@@ -75,7 +74,6 @@ export const TaskList: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
 
   const fetchTasks = async () => {
     setLoading(true);
@@ -129,23 +127,6 @@ export const TaskList: React.FC = () => {
     fetchTasks();
   }, [filterDate, status, filterCategory]);
 
-  const handleAddTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTaskTitle.trim() || !userUID) return;
-
-    await addDoc(tasksRef, {
-      title: newTaskTitle,
-      description: '', 
-      status: 'not started' as TaskStatus,
-      createdAt: Date.now(),
-      userId: userUID,
-      category: category
-    });
-
-    setNewTaskTitle('');
-    fetchTasks();
-  };
-
   const handleUpdateStatus = async (task: Task, newStatus: TaskStatus) => {
     const taskDocRef = doc(db, 'tasks', task.id);
     await updateDoc(taskDocRef, {
@@ -182,31 +163,6 @@ export const TaskList: React.FC = () => {
 
   return (
     <div>
-      <h2>Add New Task</h2>
-      <form onSubmit={handleAddTask}>
-        <div  className="filter-container">
-          <input
-            type="text"
-            value={newTaskTitle}
-            onChange={(e) => {
-              setNewTaskTitle(e.target.value)
-            }}
-            placeholder="Task title"
-          />
-          <br />
-          <select 
-            name="task_category" 
-            id="task_category"
-            onChange={(e) => {
-              setCategory(e.target.value);
-            }}>
-            <option value="Personal">Personal</option>
-            <option value="Work">Work</option>
-          </select>
-           <button type="submit">Add Task</button>
-        </div>
-      </form>
-      <hr />
       <div className="filter-container">
         <label htmlFor="date-filter">Filter tasks created on:</label>
         <input
@@ -250,7 +206,7 @@ export const TaskList: React.FC = () => {
         </select>
       </div>
       <hr />
-      
+
       <h2>Your Tasks ({tasks?.length})</h2>
       <div style={{height: "500px", width: "100%"}}>
         <DataGrid
@@ -259,9 +215,9 @@ export const TaskList: React.FC = () => {
         />
       </div>
       {isModalOpen && taskToEdit && (
-        <EditTaskModal 
-          task={taskToEdit} 
-          onClose={closeEditModal} 
+        <EditTaskModal
+          task={taskToEdit}
+          onClose={closeEditModal}
         />
       )}
     </div>
