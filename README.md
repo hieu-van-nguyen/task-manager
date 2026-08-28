@@ -6,6 +6,7 @@ A modern, full-stack task management application designed to help users organize
 
 - **User Authentication**: Secure login and logout using Firebase Authentication.
 - **Task CRUD**: Create, Read, Update, and Delete tasks in real-time.
+- **Dedicated Task Creation**: A separate page for adding new tasks to minimize clutter.
 - **Task Categorization**: Organize tasks into 'Personal' or 'Work' categories.
 - **Status Tracking**: Monitor task progress with statuses: `Not Started`, `Started`, and `Completed`.
 - **Advanced Filtering**: 
@@ -19,6 +20,7 @@ A modern, full-stack task management application designed to help users organize
 - **Frontend**: 
   - React 19
   - TypeScript
+  - React Router (for navigation)
   - Material UI (MUI) & MUI X Data Grid
   - Emotion (for styling)
 - **Backend**: 
@@ -65,6 +67,7 @@ The app will be available at [http://localhost:3000](http://localhost:3000).
 
 ## 📂 Project Structure
 
+- `src/pages/`: Application pages (Task List, Add Task).
 - `src/components/`: Reusable UI components (Auth, TaskList, Modals).
 - `src/firebase/`: Firebase configuration and initialization.
 - `src/types/`: TypeScript interfaces and type definitions.
