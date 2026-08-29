@@ -8,9 +8,11 @@ import { Task, TaskStatus } from '../types/Task';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { EditTaskModal } from './EditTaskModal';
 import { DataGrid } from '@mui/x-data-grid';
+import { useNavigate } from 'react-router-dom';
 
 export const TaskList: React.FC = () => {
   const [user] = useAuthState(auth);
+  const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
   const [filterDate, setFilterDate] = useState('');
@@ -164,48 +166,59 @@ export const TaskList: React.FC = () => {
   return (
     <div>
       <div className="filter-container">
-        <label htmlFor="date-filter">Filter tasks created on:</label>
-        <input
-          id="date-filter"
-          type="date"
-          value={filterDate}
-          onChange={(e) => {
-            setFilterDate(e.target.value)
-          }}
-        />
-        <button onClick={() => setFilterDate('')}>Clear Filter</button>
-      </div>
-      <div className="filter-container">
-        <label htmlFor="status-filter">Filter tasks by status:</label>
-        <select
-          id="status-select"
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value)
-          }}
+        <div className="filter-group">
+          <label htmlFor="date-filter">Filter tasks created on:</label>
+          <input
+            id="date-filter"
+            type="date"
+            value={filterDate}
+            onChange={(e) => {
+              setFilterDate(e.target.value)
+            }}
+          />
+        </div>
+        <div className="filter-group">
+          <label htmlFor="status-filter">Filter tasks by status:</label>
+          <select
+            id="status-select"
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value)
+            }}
+          >
+            <option value="">All</option>
+            <option value="not started">not started</option>
+            <option value="started">started</option>
+            <option value="completed">completed</option>
+          </select>
+        </div>
+        <div className="filter-group">
+          <label htmlFor="category-filter">Filter tasks by category:</label>
+          <select
+            id="category-select"
+            value={filterCategory}
+            onChange={(e) => {
+              setFilterCategory(e.target.value)
+            }}
+          >
+            <option value="">All</option>
+            <option value="Personal">Personal</option>
+            <option value="Work">Work</option>
+          </select>
+        </div>
+        <button
+          className="btn-action-fixed"
+          style={{ marginLeft: 'auto' }}
+          onClick={() => setFilterDate('')}
         >
-          <option value="">All</option>
-          <option value="not started">not started</option>
-          <option value="started">started</option>
-          <option value="completed">completed</option>
-        </select>
+          Clear Filter
+        </button>
       </div>
-      <hr />
-      <div className="filter-container">
-        <label htmlFor="status-filter">Filter tasks by category:</label>
-        <select
-          id="category-select"
-          value={filterCategory}
-          onChange={(e) => {
-            setFilterCategory(e.target.value)
-          }}
-        >
-          <option value="">All</option>
-          <option value="Personal">Personal</option>
-          <option value="Work">Work</option>
-        </select>
+      <div style={{ marginBottom: '20px' }}>
+        <button onClick={() => navigate('/add')} style={{ backgroundColor: '#28a745', color: 'white' }}>
+          + Add New Task
+        </button>
       </div>
-      <hr />
 
       <h2>Your Tasks ({tasks?.length})</h2>
       <div style={{height: "500px", width: "100%"}}>

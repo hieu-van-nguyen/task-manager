@@ -37,7 +37,7 @@ header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 0;
+  padding: 10px;
   margin-bottom: 20px;
   border-bottom: 1px solid #eee;
 }
@@ -87,6 +87,11 @@ button[type="submit"]:hover {
 button:not([type="submit"]), .login-container button {
     background-color: #6c757d;
     color: white;
+}
+
+.btn-action-fixed {
+    width: 130px;
+    text-align: center;
 }
 
 button:not([type="submit"]):hover, .login-container button:hover {
@@ -185,11 +190,18 @@ button:not([type="submit"]):hover, .login-container button:hover {
 .filter-container {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 20px;
+    flex-wrap: wrap;
     margin-bottom: 20px;
     padding: 10px;
     background-color: #f9f9f9;
     border-radius: 8px;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .filter-container label {

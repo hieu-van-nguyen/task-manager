@@ -33,7 +33,7 @@ export const AuthWrapper: React.FC<{ children: React.ReactNode }> = ({ children 
     <>
       <header>
         <span>Welcome, {user.displayName}</span>
-        <button onClick={() => signOut(auth)}>Log Out</button>
+        <button className="btn-action-fixed" onClick={() => signOut(auth)}>Log Out</button>
       </header>
       {children}
     </>
