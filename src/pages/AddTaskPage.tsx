@@ -36,12 +36,13 @@ export const AddTaskPage: React.FC = () => {
       <h2>Add New Task</h2>
       <form onSubmit={handleAddTask}>
         <div className="filter-container">
-          <input
-            type="text"
+          <textarea
             value={newTaskTitle}
             onChange={(e) => setNewTaskTitle(e.target.value)}
             placeholder="Task title"
             required
+            rows={5}
+            style={{ width: '70%' }}
           />
           <select
             name="task_category"
@@ -51,8 +52,10 @@ export const AddTaskPage: React.FC = () => {
             <option value="Personal">Personal</option>
             <option value="Work">Work</option>
           </select>
+        </div>
+        <div className="button-container" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-start' }}>
            <button type="submit">Add Task</button>
-           <button type="button" onClick={() => navigate('/')} style={{marginLeft: '10px', backgroundColor: '#6c757d', color: 'white'}}>Cancel</button>
+           <button type="button" onClick={() => navigate('/')} style={{backgroundColor: '#6c757d', color: 'white'}}>Cancel</button>
         </div>
       </form>
     </div>
