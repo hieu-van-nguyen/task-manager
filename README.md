@@ -10,6 +10,7 @@ A personal task manager built with **React 19**, **TypeScript**, and **Firebase*
 - **Categories**: `Personal` or `Work`
 - **Filtering** by creation date, status, and category
 - **Sortable, paginated table** powered by MUI X Data Grid, newest tasks first, with quick search, column filters and CSV export
+- **Real-time sync**: changes appear instantly across tabs and devices (Firestore listeners)
 - **Timestamps** for created, last updated, and completed (server time)
 - **Responsive Material UI design** with a shared theme
 

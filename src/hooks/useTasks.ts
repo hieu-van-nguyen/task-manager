@@ -5,49 +5,50 @@ import { Task, TaskStatus } from '../types/Task';
 import * as tasksService from '../services/tasks';
 
 /**
- * Loads the signed-in user's tasks and exposes mutations that refresh the list
- * afterwards. Errors are captured in `error` rather than thrown.
+ * Live list of the signed-in user's tasks (Firestore onSnapshot), plus mutations.
+ * There is no manual refetching: every write, from this tab, another tab or another
+ * device, pushes a new snapshot. Errors are captured in `error` rather than thrown.
  */
 export const useTasks = () => {
   const [user] = useAuthState(auth);
   const userId = user?.uid;
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    if (!userId) return;
-    setLoading(true);
-    try {
-      setTasks(await tasksService.fetchUserTasks(userId));
-      setError(null);
-    } catch (err) {
-      console.error(err);
-      setError(`Failed to load tasks: ${tasksService.getErrorMessage(err)}`);
-    } finally {
+  useEffect(() => {
+    if (!userId) {
+      setTasks([]);
       setLoading(false);
+      return;
     }
+    setLoading(true);
+    const unsubscribe = tasksService.subscribeToUserTasks(
+      userId,
+      (next) => {
+        setTasks(next);
+        setLoading(false);
+      },
+      (err) => {
+        console.error(err);
+        setError(`Failed to load tasks: ${tasksService.getErrorMessage(err)}`);
+        setLoading(false);
+      }
+    );
+    return unsubscribe; // Stop listening on sign-out / unmount.
   }, [userId]);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  /** Runs a mutation, then refreshes. Returns false (and sets `error`) on failure. */
-  const mutate = useCallback(
-    async (action: () => Promise<void>, failureMessage: string) => {
-      try {
-        await action();
-        await refresh();
-        return true;
-      } catch (err) {
-        console.error(err);
-        setError(`${failureMessage}: ${tasksService.getErrorMessage(err)}`);
-        return false;
-      }
-    },
-    [refresh]
-  );
+  /** Runs a mutation. Returns false (and sets `error`) on failure. */
+  const mutate = useCallback(async (action: () => Promise<void>, failureMessage: string) => {
+    try {
+      await action();
+      return true;
+    } catch (err) {
+      console.error(err);
+      setError(`${failureMessage}: ${tasksService.getErrorMessage(err)}`);
+      return false;
+    }
+  }, []);
 
   const updateStatus = useCallback(
     (task: Task, status: TaskStatus) =>
@@ -65,7 +66,6 @@ export const useTasks = () => {
     loading,
     error,
     clearError: () => setError(null),
-    refresh,
     updateStatus,
     remove,
   };

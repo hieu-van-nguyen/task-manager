@@ -11,10 +11,11 @@ import {
   deleteDoc,
   doc,
   DocumentData,
-  getDocs,
+  onSnapshot,
   query,
   QueryDocumentSnapshot,
   serverTimestamp,
+  Unsubscribe,
   updateDoc,
   where,
 } from 'firebase/firestore';
@@ -48,12 +49,23 @@ export const toTask = (id: string, data: DocumentData): Task => ({
   completedAt: toMillis(data.completedAt),
 });
 
-const snapshotToTask = (snap: QueryDocumentSnapshot) => toTask(snap.id, snap.data());
+// 'estimate': a local write's pending serverTimestamp() reads as the local time
+// instead of null, so a just-created task doesn't briefly show no date.
+const snapshotToTask = (snap: QueryDocumentSnapshot) =>
+  toTask(snap.id, snap.data({ serverTimestamps: 'estimate' }));
 
-export const fetchUserTasks = async (userId: string): Promise<Task[]> => {
+/**
+ * Subscribes to the user's tasks. `onChange` fires immediately with the current
+ * list, then again on every change from this tab, other tabs, or other devices.
+ * Returns the unsubscribe function.
+ */
+export const subscribeToUserTasks = (
+  userId: string,
+  onChange: (tasks: Task[]) => void,
+  onError: (error: Error) => void
+): Unsubscribe => {
   const q = query(collection(db, TASKS), where('userId', '==', userId));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(snapshotToTask);
+  return onSnapshot(q, snapshot => onChange(snapshot.docs.map(snapshotToTask)), onError);
 };
 
 export const createTask = async (userId: string, task: NewTask): Promise<string> => {

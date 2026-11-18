@@ -42,8 +42,9 @@ React 19 + TypeScript SPA (CRA, TypeScript 4.9 because of `react-scripts` 5) bac
 - `src/types/Task.ts`: `Task`, `NewTask`, `TaskEdits`, and `TaskStatus` / `TaskCategory` unions derived from the `TASK_STATUSES` / `TASK_CATEGORIES` constants. Use the constants for dropdowns, not hard-coded strings.
 
 ### Data access patterns (important when changing behavior)
-- **All Firestore access goes through `src/services/tasks.ts`** (`fetchUserTasks`, `createTask`, `updateTask`, `updateTaskStatus`, `deleteTask`). Components never import `firebase/firestore` directly.
-- `src/hooks/useTasks.ts` loads the signed-in user's tasks and wraps status updates and deletes, storing failures in `error`. It makes a **one-time `getDocs`** query (`where('userId', '==', uid)`), not a live listener, and calls `refresh()` again after every mutation.
+- **All Firestore access goes through `src/services/tasks.ts`** (`subscribeToUserTasks`, `createTask`, `updateTask`, `updateTaskStatus`, `deleteTask`). Components never import `firebase/firestore` directly.
+- **The task list is live.** `src/hooks/useTasks.ts` subscribes with `onSnapshot` (`where('userId', '==', uid)`) and unsubscribes on sign-out or unmount. Writes from this tab, other tabs or other devices all arrive as new snapshots, so **never refetch after a mutation**: just write, and the list updates. The hook also wraps status updates and deletes, storing failures in `error`.
+- Snapshots are read with `serverTimestamps: 'estimate'`, so a just-written `serverTimestamp()` shows the local time instead of `null` until the server confirms it.
 - The service maps documents with `toTask`, which normalizes timestamps (see below) and falls back to safe defaults for missing or unknown fields.
 - Date, status and category filtering and the newest-first sort all run **in the browser** in `src/utils/filterTasks.ts` (a pure, unit-tested function; date filtering uses the user's local day), so changing a filter doesn't refetch and no composite Firestore indexes are needed. Adding server-side `orderBy` or more `where` clauses would require an index.
 - Auth state is read with `useAuthState(auth)` from `react-firebase-hooks` in each component that needs it. There is no React context.

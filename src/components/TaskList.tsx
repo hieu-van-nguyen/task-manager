@@ -17,7 +17,7 @@ const toDate = (value: number | null | undefined) => (value ? new Date(value) : 
 
 export const TaskList: React.FC = () => {
   const navigate = useNavigate();
-  const { tasks: allTasks, loading, error, clearError, refresh, updateStatus, remove } = useTasks();
+  const { tasks: allTasks, loading, error, clearError, updateStatus, remove } = useTasks();
   const [filters, setFilters] = useState<TaskFilters>(EMPTY_FILTERS);
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
@@ -34,10 +34,8 @@ export const TaskList: React.FC = () => {
     await remove(task);
   };
 
-  const closeEditModal = (saved: boolean) => {
-    setTaskToEdit(null);
-    if (saved) refresh();
-  };
+  // No refresh needed after saving: the live subscription picks up the change.
+  const closeEditModal = () => setTaskToEdit(null);
 
   const columns: GridColDef<Task>[] = [
     {

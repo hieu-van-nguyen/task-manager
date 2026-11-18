@@ -7,8 +7,8 @@ import { getErrorMessage, updateTask } from '../services/tasks';
 
 interface EditTaskModalProps {
   task: Task;
-  /** Called with `true` if changes were saved, `false` if cancelled. */
-  onClose: (saved: boolean) => void;
+  /** Called after saving or cancelling. The task list updates itself via its live subscription. */
+  onClose: () => void;
 }
 
 export const EditTaskModal: React.FC<EditTaskModalProps> = ({ task, onClose }) => {
@@ -38,7 +38,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ task, onClose }) =
     setIsSubmitting(true);
     try {
       await updateTask(task.id, { title, description, category });
-      onClose(true);
+      onClose();
     } catch (err) {
       console.error('Error updating task: ', err);
       setError(`Failed to save changes: ${getErrorMessage(err)}`);
@@ -47,7 +47,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ task, onClose }) =
   };
 
   const cancel = () => {
-    if (!isSubmitting) onClose(false);
+    if (!isSubmitting) onClose();
   };
 
   return (
