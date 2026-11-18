@@ -4,21 +4,33 @@ import { db, auth } from '../firebase/config';
 import { TaskStatus } from '../types/Task';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useNavigate } from 'react-router-dom';
+import { Alert } from '@mui/material';
 
 export const AddTaskPage: React.FC = () => {
   const [user] = useAuthState(auth);
   const navigate = useNavigate();
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [category, setCategory] = useState('Personal');
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const userUID = user?.uid;
 
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTaskTitle.trim() || !userUID) return;
+    setError(null);
+    if (!newTaskTitle.trim()) {
+      setError('Title cannot be empty.');
+      return;
+    }
+    if (!userUID) {
+      setError('You must be signed in to add a task.');
+      return;
+    }
 
+    setIsSubmitting(true);
     try {
       await addDoc(collection(db, 'tasks'), {
-        title: newTaskTitle,
+        title: newTaskTitle.trim(),
         description: '',
         status: 'not started' as TaskStatus,
         createdAt: Date.now(),
@@ -28,12 +40,15 @@ export const AddTaskPage: React.FC = () => {
       navigate('/'); // Redirect back to the task list
     } catch (error) {
       console.error("Error adding task: ", error);
+      setError(`Failed to add task: ${error instanceof Error ? error.message : String(error)}`);
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div className="add-task-container">
       <h2>Add New Task</h2>
+      {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>{error}</Alert>}
       <form onSubmit={handleAddTask}>
         <div className="filter-container">
           <textarea
@@ -54,7 +69,7 @@ export const AddTaskPage: React.FC = () => {
           </select>
         </div>
         <div className="button-container" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-start' }}>
-           <button type="submit">Add Task</button>
+           <button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Adding...' : 'Add Task'}</button>
            <button type="button" onClick={() => navigate('/')} style={{backgroundColor: '#6c757d', color: 'white'}}>Cancel</button>
         </div>
       </form>
