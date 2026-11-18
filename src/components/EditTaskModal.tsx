@@ -1,25 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { updateDoc, doc } from 'firebase/firestore';
-import { db } from '../firebase/config';
-import { Task } from '../types/Task';
-import { Alert } from '@mui/material';
-import './EditTaskModal.css'; // We'll add styles in the next step
+import React, { useEffect, useState } from 'react';
+import {
+  Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField,
+} from '@mui/material';
+import { Task, TASK_CATEGORIES, TaskCategory } from '../types/Task';
+import { getErrorMessage, updateTask } from '../services/tasks';
 
 interface EditTaskModalProps {
   task: Task;
-  onClose: () => void;
+  /** Called with `true` if changes were saved, `false` if cancelled. */
+  onClose: (saved: boolean) => void;
 }
 
 export const EditTaskModal: React.FC<EditTaskModalProps> = ({ task, onClose }) => {
   const [title, setTitle] = useState(task.title);
-  const [description, setDescription] = useState(task.description || '');
+  const [description, setDescription] = useState(task.description);
+  const [category, setCategory] = useState<TaskCategory>(task.category);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Sync state if the task prop changes (e.g., if the modal is reused)
   useEffect(() => {
     setTitle(task.title);
-    setDescription(task.description || '');
+    setDescription(task.description);
+    setCategory(task.category);
     setError(null);
   }, [task]);
 
@@ -34,51 +37,65 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ task, onClose }) =
 
     setIsSubmitting(true);
     try {
-      const taskDocRef = doc(db, 'tasks', task.id);
-      await updateDoc(taskDocRef, {
-        title: title.trim(),
-        description: description.trim(),
-      });
-      onClose();
-    } catch (error) {
-      console.error("Error updating document: ", error);
-      setError(`Failed to save changes: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
+      await updateTask(task.id, { title, description, category });
+      onClose(true);
+    } catch (err) {
+      console.error('Error updating task: ', err);
+      setError(`Failed to save changes: ${getErrorMessage(err)}`);
       setIsSubmitting(false);
     }
   };
 
+  const cancel = () => {
+    if (!isSubmitting) onClose(false);
+  };
+
   return (
-    <div className="modal-overlay">
-      <div className="modal-content">
-        <h3>Edit Task</h3>
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-        <form onSubmit={handleSubmit}>
-          <label>Title:</label>
-          <input
-            type="text"
+    <Dialog
+      open
+      onClose={cancel}
+      fullWidth
+      maxWidth="sm"
+      slotProps={{ paper: { component: 'form', onSubmit: handleSubmit } as object }}
+      aria-labelledby="edit-task-title"
+    >
+      <DialogTitle id="edit-task-title">Edit Task</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ pt: 1 }}>
+          {error && <Alert severity="error">{error}</Alert>}
+          <TextField
+            label="Title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
+            autoFocus
+            fullWidth
           />
-
-          <label>Description (Optional):</label>
-          <textarea
+          <TextField
+            label="Description (optional)"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            rows={4}
+            multiline
+            minRows={4}
+            fullWidth
           />
-
-          <div className="modal-actions">
-            <button type="button" onClick={onClose} disabled={isSubmitting}>
-              Cancel
-            </button>
-            <button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          <TextField
+            select
+            label="Category"
+            value={category}
+            onChange={(e) => setCategory(e.target.value as TaskCategory)}
+            fullWidth
+          >
+            {TASK_CATEGORIES.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+          </TextField>
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={cancel} disabled={isSubmitting}>Cancel</Button>
+        <Button type="submit" variant="contained" disabled={isSubmitting}>
+          {isSubmitting ? 'Saving...' : 'Save Changes'}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 };

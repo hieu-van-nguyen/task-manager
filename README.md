@@ -5,11 +5,13 @@ A personal task manager built with **React 19**, **TypeScript**, and **Firebase*
 ## Features
 
 - **Google sign-in** with Firebase Authentication
-- **Full task CRUD**: add tasks on a separate page, edit title and description in a modal, delete from the list
+- **Full task CRUD**: add tasks on a separate page, edit title, description and category in a dialog, delete with confirmation
 - **Status tracking**: `not started` → `started` → `completed`, changed inline from the task table
 - **Categories**: `Personal` or `Work`
 - **Filtering** by creation date, status, and category
-- **Sortable, paginated table** powered by MUI X Data Grid, newest tasks first
+- **Sortable, paginated table** powered by MUI X Data Grid, newest tasks first, with quick search, column filters and CSV export
+- **Timestamps** for created, last updated, and completed (server time)
+- **Responsive Material UI design** with a shared theme
 
 ## Tech Stack
 
@@ -116,18 +118,27 @@ Remember to add your hosting domain under **Authentication → Settings → Auth
 
 ```
 src/
+├── index.tsx                # MUI ThemeProvider + CssBaseline
+├── theme.ts                 # MUI theme (colors, typography, defaults)
 ├── App.tsx                  # Auth gate + routes (/ and /add)
 ├── components/
-│   ├── AuthWrapper.tsx      # Google sign-in / sign-out, welcome header
+│   ├── AuthWrapper.tsx      # Sign-in screen, app bar, page layout
 │   ├── TaskList.tsx         # Filters, Data Grid, status updates, delete
-│   └── EditTaskModal.tsx    # Edit task title & description
+│   ├── EditTaskModal.tsx    # Edit dialog (title, description, category)
+│   └── ConfirmDialog.tsx    # Reusable confirmation dialog
 ├── pages/
 │   ├── TaskListPage.tsx     # Route "/"
 │   └── AddTaskPage.tsx      # Route "/add": create a task
+├── hooks/
+│   └── useTasks.ts          # Loads the user's tasks, status/delete actions
+├── services/
+│   └── tasks.ts             # All Firestore reads/writes for tasks
+├── utils/
+│   └── filterTasks.ts       # Client-side filtering and sorting
 ├── firebase/
 │   └── config.ts            # Firebase init (you create this; gitignored)
 └── types/
-    └── Task.ts              # Task and TaskStatus types
+    └── Task.ts              # Task types, statuses, categories
 ```
 
 ## Data Model
@@ -140,5 +151,9 @@ Tasks are stored in the Firestore collection `tasks`:
 | `description` | string | Optional details |
 | `status` | string | `not started` \| `started` \| `completed` |
 | `category` | string | `Personal` \| `Work` |
-| `createdAt` | number | Creation time in epoch milliseconds |
 | `userId` | string | Firebase Auth UID of the owner |
+| `createdAt` | Timestamp | Creation time (server time; older tasks store epoch milliseconds) |
+| `updatedAt` | Timestamp | Last time the task was edited or its status changed |
+| `completedAt` | Timestamp \| null | When the task was marked completed |
+
+Times are written with Firestore `serverTimestamp()`, so they don't depend on the user's device clock.

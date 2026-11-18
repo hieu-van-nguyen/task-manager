@@ -7,6 +7,8 @@ const makeTask = (overrides: Partial<Task>): Task => ({
   description: '',
   status: 'not started',
   createdAt: Date.now(),
+  updatedAt: null,
+  completedAt: null,
   userId: 'user-1',
   category: 'Personal',
   ...overrides,

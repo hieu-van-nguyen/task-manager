@@ -1,210 +1,188 @@
 // src/components/TaskList.tsx
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { collection, query, where, doc, updateDoc, deleteDoc, getDocs } from 'firebase/firestore';
-import { db, auth } from '../firebase/config';
-import { Task, TaskStatus } from '../types/Task';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { EditTaskModal } from './EditTaskModal';
-import { DataGrid } from '@mui/x-data-grid';
-import { Alert } from '@mui/material';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
+import { Alert, Box, Button, MenuItem, Select, Stack, TextField, Typography } from '@mui/material';
+import { STATUS_LABELS, Task, TASK_CATEGORIES, TASK_STATUSES, TaskCategory, TaskStatus } from '../types/Task';
+import { useTasks } from '../hooks/useTasks';
 import { EMPTY_FILTERS, TaskFilters, filterAndSortTasks } from '../utils/filterTasks';
+import { EditTaskModal } from './EditTaskModal';
+import { ConfirmDialog } from './ConfirmDialog';
 
-const getErrorMessage = (err: unknown) => (err instanceof Error ? err.message : String(err));
+const STATUS_OPTIONS = TASK_STATUSES.map(value => ({ value, label: STATUS_LABELS[value] }));
+
+/** Firestore times are epoch ms; the grid's dateTime columns need Date objects. */
+const toDate = (value: number | null | undefined) => (value ? new Date(value) : null);
 
 export const TaskList: React.FC = () => {
-  const [user] = useAuthState(auth);
   const navigate = useNavigate();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
+  const { tasks: allTasks, loading, error, clearError, refresh, updateStatus, remove } = useTasks();
   const [filters, setFilters] = useState<TaskFilters>(EMPTY_FILTERS);
-  const [allTasks, setAllTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const userUID = user?.uid;
-
-  const fetchTasks = useCallback(async () => {
-    if (!userUID) return;
-    setLoading(true);
-    try {
-      const q = query(
-        collection(db, 'tasks'),
-        where('userId', '==', userUID) // Only fetch tasks for the logged-in user
-      );
-      const querySnapshot = await getDocs(q);
-      setAllTasks(querySnapshot.docs.map(d => {
-        const data = d.data();
-        return {
-          id: d.id, // The Firestore document ID
-          title: data.title,
-          description: data.description,
-          status: data.status,
-          createdAt: data.createdAt, // epoch milliseconds
-          userId: data.userId,
-          category: data.category && data.category.length > 0 ? data.category : 'Personal'
-        };
-      }));
-      setError(null);
-    } catch (err) {
-      console.error(err);
-      setError(`Failed to load tasks: ${getErrorMessage(err)}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [userUID]);
-
-  // Fetch once per user; filtering happens client-side so it doesn't need a refetch.
-  useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
+  const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
 
   const tasks = useMemo(() => filterAndSortTasks(allTasks, filters), [allTasks, filters]);
 
-  const updateFilter = (key: keyof TaskFilters, value: string) =>
+  const updateFilter = <K extends keyof TaskFilters>(key: K, value: TaskFilters[K]) =>
     setFilters(prev => ({ ...prev, [key]: value }));
 
-  const handleUpdateStatus = async (task: Task, newStatus: TaskStatus) => {
-    try {
-      await updateDoc(doc(db, 'tasks', task.id), { status: newStatus });
-      await fetchTasks();
-    } catch (err) {
-      console.error(err);
-      setError(`Failed to update status: ${getErrorMessage(err)}`);
-    }
+  const confirmDelete = async () => {
+    if (!taskToDelete) return;
+    const task = taskToDelete;
+    setTaskToDelete(null);
+    await remove(task);
   };
 
-  const handleDeleteTask = async (task: Task) => {
-    if (!window.confirm(`Delete task "${task.title}"? This cannot be undone.`)) return;
-    try {
-      await deleteDoc(doc(db, 'tasks', task.id));
-      await fetchTasks();
-    } catch (err) {
-      console.error(err);
-      setError(`Failed to delete task: ${getErrorMessage(err)}`);
-    }
+  const closeEditModal = (saved: boolean) => {
+    setTaskToEdit(null);
+    if (saved) refresh();
   };
 
-  // Handlers for modal
-  const openEditModal = (task: Task) => {
-    setTaskToEdit(task);
-    setIsModalOpen(true);
-  };
-
-  const closeEditModal = () => {
-    setIsModalOpen(false);
-    setTaskToEdit(null); // Clear the task being edited
-    fetchTasks();
-  };
-
-  const columns = [
+  const columns: GridColDef<Task>[] = [
     {
-      field: 'category', headerName: 'Category', width: 110
+      field: 'category', headerName: 'Category', width: 110,
+      type: 'singleSelect', valueOptions: [...TASK_CATEGORIES],
     },
     {
-      field: 'title', headerName: 'Title', width: 500
+      field: 'title', headerName: 'Title', flex: 1, minWidth: 250,
     },
     {
-      field: 'status', headerName: 'Status', width: 110
-    },
-    {
-      field: 'update_status', headerName: 'Update Status', width: 110,
-      renderCell: (params: any) => (
-        <select
+      // Single status column: the value drives sorting/filtering/search/export,
+      // the dropdown lets the user change it inline.
+      field: 'status', headerName: 'Status', width: 160,
+      type: 'singleSelect', valueOptions: STATUS_OPTIONS,
+      renderCell: (params: GridRenderCellParams<Task, TaskStatus>) => (
+        <Select
           value={params.row.status}
-          onChange={(e) => handleUpdateStatus(params.row, e.target.value as TaskStatus)}
+          size="small"
+          variant="standard"
+          disableUnderline
+          fullWidth
+          inputProps={{ 'aria-label': `Status for ${params.row.title}` }}
+          onChange={(e) => updateStatus(params.row, e.target.value as TaskStatus)}
+          // Keep keyboard input in the dropdown instead of the grid's cell navigation.
+          onKeyDown={(e) => e.stopPropagation()}
         >
-          <option value="not started">Not Started</option>
-          <option value="started">Started</option>
-          <option value="completed">Completed</option>
-        </select>
+          {STATUS_OPTIONS.map(o => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+        </Select>
       ),
     },
     {
-      field: 'createdAt', headerName: 'Create Date', width: 200,
-      renderCell: (params: any) => <>{new Date(params.row.createdAt).toLocaleString()}</>,
+      field: 'createdAt', headerName: 'Created', width: 190,
+      type: 'dateTime', valueGetter: toDate,
     },
     {
-      field: 'action', headerName: '', width: 250,
-      renderCell: (params: any) => (
-        <div>
-          <button onClick={() => openEditModal(params.row)} className="edit-button">Edit</button>
-          <button style={{ marginLeft: 20 }} onClick={() => handleDeleteTask(params.row)}>Delete</button>
-        </div>
+      // Hidden by default; can be shown from the toolbar's Columns menu.
+      field: 'updatedAt', headerName: 'Updated', width: 190,
+      type: 'dateTime', valueGetter: toDate,
+    },
+    {
+      field: 'completedAt', headerName: 'Completed', width: 190,
+      type: 'dateTime', valueGetter: toDate,
+    },
+    {
+      field: 'action', headerName: 'Actions', width: 170,
+      sortable: false, filterable: false, disableColumnMenu: true, disableExport: true,
+      renderCell: (params: GridRenderCellParams<Task>) => (
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ height: '100%' }}>
+          <Button size="small" variant="outlined" onClick={() => setTaskToEdit(params.row)}>
+            Edit
+          </Button>
+          <Button size="small" variant="outlined" color="error" onClick={() => setTaskToDelete(params.row)}>
+            Delete
+          </Button>
+        </Stack>
       ),
     }
   ];
 
   return (
-    <div>
+    <Box>
       {error && (
-        <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
+        <Alert severity="error" onClose={clearError} sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
-      <div className="filter-container">
-        <div className="filter-group">
-          <label htmlFor="date-filter">Filter tasks created on:</label>
-          <input
-            id="date-filter"
-            type="date"
-            value={filters.date}
-            onChange={(e) => updateFilter('date', e.target.value)}
-          />
-        </div>
-        <div className="filter-group">
-          <label htmlFor="status-filter">Filter tasks by status:</label>
-          <select
-            id="status-filter"
-            value={filters.status}
-            onChange={(e) => updateFilter('status', e.target.value)}
-          >
-            <option value="">All</option>
-            <option value="not started">not started</option>
-            <option value="started">started</option>
-            <option value="completed">completed</option>
-          </select>
-        </div>
-        <div className="filter-group">
-          <label htmlFor="category-filter">Filter tasks by category:</label>
-          <select
-            id="category-filter"
-            value={filters.category}
-            onChange={(e) => updateFilter('category', e.target.value)}
-          >
-            <option value="">All</option>
-            <option value="Personal">Personal</option>
-            <option value="Work">Work</option>
-          </select>
-        </div>
-        <button
-          className="btn-action-fixed"
-          style={{ marginLeft: 'auto' }}
-          onClick={() => setFilters(EMPTY_FILTERS)}
-        >
-          Clear Filter
-        </button>
-      </div>
-      <div style={{ marginBottom: '20px' }}>
-        <button onClick={() => navigate('/add')} style={{ backgroundColor: '#28a745', color: 'white' }}>
-          + Add New Task
-        </button>
-      </div>
 
-      <h2>Your Tasks ({tasks.length})</h2>
-      <div style={{ height: "500px", width: "100%" }}>
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={2}
+        alignItems={{ xs: 'stretch', md: 'center' }}
+        sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}
+      >
+        <TextField
+          id="date-filter"
+          label="Created on"
+          type="date"
+          value={filters.date}
+          onChange={(e) => updateFilter('date', e.target.value)}
+          slotProps={{ inputLabel: { shrink: true } }}
+        />
+        <TextField
+          id="status-filter"
+          select
+          label="Status"
+          value={filters.status}
+          onChange={(e) => updateFilter('status', e.target.value as TaskStatus | '')}
+          sx={{ minWidth: 160 }}
+        >
+          <MenuItem value="">All</MenuItem>
+          {STATUS_OPTIONS.map(o => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+        </TextField>
+        <TextField
+          id="category-filter"
+          select
+          label="Category"
+          value={filters.category}
+          onChange={(e) => updateFilter('category', e.target.value as TaskCategory | '')}
+          sx={{ minWidth: 160 }}
+        >
+          <MenuItem value="">All</MenuItem>
+          {TASK_CATEGORIES.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+        </TextField>
+        <Button variant="outlined" color="secondary" onClick={() => setFilters(EMPTY_FILTERS)}>
+          Clear Filters
+        </Button>
+        <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'block' } }} />
+        <Button variant="contained" color="success" onClick={() => navigate('/add')}>
+          + Add New Task
+        </Button>
+      </Stack>
+
+      <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
+        Your Tasks ({tasks.length})
+      </Typography>
+      <Box sx={{ height: 560, width: '100%' }}>
         <DataGrid
           rows={tasks}
           columns={columns}
           loading={loading}
+          showToolbar
+          initialState={{
+            sorting: { sortModel: [{ field: 'createdAt', sort: 'desc' }] },
+            columns: { columnVisibilityModel: { updatedAt: false, completedAt: false } },
+          }}
+          slotProps={{
+            toolbar: {
+              csvOptions: { fileName: 'tasks', utf8WithBom: true },
+              printOptions: { disableToolbarButton: true },
+            },
+          }}
         />
-      </div>
-      {isModalOpen && taskToEdit && (
-        <EditTaskModal
-          task={taskToEdit}
-          onClose={closeEditModal}
-        />
+      </Box>
+
+      {taskToEdit && (
+        <EditTaskModal task={taskToEdit} onClose={closeEditModal} />
       )}
-    </div>
+      <ConfirmDialog
+        open={taskToDelete !== null}
+        title="Delete task?"
+        message={<>"{taskToDelete?.title}" will be permanently deleted. This cannot be undone.</>}
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+        onCancel={() => setTaskToDelete(null)}
+      />
+    </Box>
   );
 };

@@ -1,12 +1,12 @@
-import { Task } from '../types/Task';
+import { Task, TaskCategory, TaskStatus } from '../types/Task';
 
 export interface TaskFilters {
-  /** Date string from an <input type="date">, e.g. "2026-11-14". Empty = no filter. */
+  /** Date string from a date input, e.g. "2026-11-14". Empty = no filter. */
   date: string;
-  /** TaskStatus value. Empty = no filter. */
-  status: string;
-  /** Category value. Empty = no filter. */
-  category: string;
+  /** Empty = no filter. */
+  status: TaskStatus | '';
+  /** Empty = no filter. */
+  category: TaskCategory | '';
 }
 
 export const EMPTY_FILTERS: TaskFilters = { date: '', status: '', category: '' };

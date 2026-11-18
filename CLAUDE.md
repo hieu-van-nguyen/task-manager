@@ -30,18 +30,21 @@ Never commit this file. Because of the `**/config.ts` ignore rule, any other fil
 React 19 + TypeScript SPA (CRA, TypeScript 4.9 because of `react-scripts` 5) backed by Firebase Auth (Google sign-in) and Cloud Firestore. There is no custom backend.
 
 ### Flow
-- `src/index.tsx` → `src/App.tsx`. `App` wraps everything in `AuthWrapper`, and mounts the React Router (`BrowserRouter`) only when a user is signed in.
-- `src/components/AuthWrapper.tsx`: shows a loading or error state, a "Sign in with Google" button (`signInWithPopup`), or the welcome header with Log Out followed by `children`.
+- `src/index.tsx` wraps `App` in MUI `ThemeProvider` (theme in `src/theme.ts`) + `CssBaseline`.
+- `src/App.tsx`: `AuthWrapper` around the React Router (`BrowserRouter`); routes only render once a user is signed in.
+- `src/components/AuthWrapper.tsx`: app shell. Shows auth loading, the "Sign in with Google" card (`signInWithPopup`), or the `AppBar` (welcome + Log Out) with `children` in a `Container`/`Paper`.
 - Routes:
   - `/` → `src/pages/TaskListPage.tsx` (thin wrapper) → `src/components/TaskList.tsx`
   - `/add` → `src/pages/AddTaskPage.tsx` (create form, navigates back to `/` on success)
-- `src/components/TaskList.tsx`: the main dashboard. It fetches tasks, renders filters, shows an MUI X `DataGrid`, handles inline status changes and deletes, and opens `EditTaskModal`.
-- `src/components/EditTaskModal.tsx`: edits `title` and `description` only.
-- `src/types/Task.ts`: `Task` interface and `TaskStatus` union.
+- `src/components/TaskList.tsx`: the main dashboard. Filters, MUI X `DataGrid` (built-in toolbar with quick search, column filters and CSV export; inline status `Select`; hidden-by-default Updated/Completed columns), the edit dialog and a delete `ConfirmDialog`.
+- `src/components/EditTaskModal.tsx`: MUI `Dialog` for editing title, description and category.
+- `src/components/ConfirmDialog.tsx`: generic confirm dialog (use instead of `window.confirm`).
+- `src/types/Task.ts`: `Task`, `NewTask`, `TaskEdits`, and `TaskStatus` / `TaskCategory` unions derived from the `TASK_STATUSES` / `TASK_CATEGORIES` constants. Use the constants for dropdowns, not hard-coded strings.
 
 ### Data access patterns (important when changing behavior)
-- Firestore is accessed directly from components with the modular SDK (`collection`, `addDoc`, `updateDoc`, `deleteDoc`, `getDocs`). There is no service layer.
-- `TaskList` makes a **one-time `getDocs`** query: `where('userId', '==', uid)`. It is not a live listener, so after every mutation it calls `fetchTasks()` again. `useCollectionData` is imported but not used.
+- **All Firestore access goes through `src/services/tasks.ts`** (`fetchUserTasks`, `createTask`, `updateTask`, `updateTaskStatus`, `deleteTask`). Components never import `firebase/firestore` directly.
+- `src/hooks/useTasks.ts` loads the signed-in user's tasks and wraps status updates and deletes, storing failures in `error`. It makes a **one-time `getDocs`** query (`where('userId', '==', uid)`), not a live listener, and calls `refresh()` again after every mutation.
+- The service maps documents with `toTask`, which normalizes timestamps (see below) and falls back to safe defaults for missing or unknown fields.
 - Date, status and category filtering and the newest-first sort all run **in the browser** in `src/utils/filterTasks.ts` (a pure, unit-tested function; date filtering uses the user's local day), so changing a filter doesn't refetch and no composite Firestore indexes are needed. Adding server-side `orderBy` or more `where` clauses would require an index.
 - Auth state is read with `useAuthState(auth)` from `react-firebase-hooks` in each component that needs it. There is no React context.
 
@@ -49,16 +52,18 @@ React 19 + TypeScript SPA (CRA, TypeScript 4.9 because of `react-scripts` 5) bac
 | Field | Type | Notes |
 |---|---|---|
 | `title` | string | required |
-| `description` | string | `''` on create, editable in the modal |
+| `description` | string | `''` on create, editable in the dialog |
 | `status` | `'not started' \| 'started' \| 'completed'` | new tasks start as `'not started'` |
-| `createdAt` | number | **epoch milliseconds** (`Date.now()`), not a Firestore `Timestamp` |
+| `category` | `'Personal' \| 'Work'` | missing or unknown values are read as `'Personal'` |
 | `userId` | string | Firebase Auth `uid` of the owner |
-| `category` | `'Personal' \| 'Work'` | typed as `string`; missing or empty values are treated as `'Personal'` when read |
+| `createdAt` | Timestamp **or** number | new docs: `serverTimestamp()`; legacy docs: epoch-ms number |
+| `updatedAt` | Timestamp \| missing | set by `serverTimestamp()` on create and on every edit/status change |
+| `completedAt` | Timestamp \| null \| missing | set when status becomes `'completed'`, cleared to `null` otherwise |
 
-The document ID is mapped to `Task.id` when read and is not stored as a field.
+`toMillis` in the service converts both storage formats, so **in the app every time is epoch ms** (`number`, or `null` when absent). Because `createdAt` holds mixed types across documents, don't add a server-side `orderBy('createdAt')` without migrating legacy docs first. The document ID is mapped to `Task.id` when read and is not stored as a field.
 
 ### Styling
-Mostly plain HTML elements styled with global CSS in `src/App.css` / `src/index.css` (classes such as `filter-container`, `btn-action-fixed`) plus `EditTaskModal.css`, with some inline styles. MUI is installed but only `DataGrid` is actually used.
+MUI everywhere: use MUI components (`Button`, `TextField`, `Select`/`TextField select`, `Dialog`, `Stack`, `Alert`) and the `sx` prop, plus theme tokens from `src/theme.ts`. There are no global CSS files; don't add raw `<button>`/`<select>` elements or global element selectors, which would fight MUI styles. Use responsive `sx` values (`{ xs: ..., md: ... }`) for layout.
 
 ## Testing notes
 - Tests mock `./firebase/config`, `firebase/auth` and `react-firebase-hooks/auth` (see `src/App.test.tsx`), so they never touch a real Firebase project.
