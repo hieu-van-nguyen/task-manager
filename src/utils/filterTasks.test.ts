@@ -1,22 +1,7 @@
-import { Task } from '../types/Task';
-import { EMPTY_FILTERS, filterAndSortTasks, getLocalDayRange } from './filterTasks';
-
-const makeTask = (overrides: Partial<Task>): Task => ({
-  id: Math.random().toString(36),
-  title: 'Task',
-  description: '',
-  status: 'not started',
-  createdAt: Date.now(),
-  updatedAt: null,
-  completedAt: null,
-  userId: 'user-1',
-  category: 'Personal',
-  ...overrides,
-});
-
-// Local-time helper so tests pass in any timezone.
-const local = (y: number, m: number, d: number, h = 0, min = 0) =>
-  new Date(y, m - 1, d, h, min).getTime();
+import { local, makeTask } from '../testUtils';
+import {
+  EMPTY_FILTERS, filterAndSortTasks, getAllCategories, getLocalDayRange, hasActiveFilters, sortForBoard,
+} from './filterTasks';
 
 describe('getLocalDayRange', () => {
   it('returns local midnight to next local midnight', () => {
@@ -46,16 +31,32 @@ describe('filterAndSortTasks', () => {
     expect(result.map(t => t.title)).toEqual(['late', 'early']);
   });
 
-  it('filters by status and category', () => {
+  it('filters by status, priority and category', () => {
     const tasks = [
-      makeTask({ title: 'a', status: 'completed', category: 'Work' }),
-      makeTask({ title: 'b', status: 'completed', category: 'Personal' }),
-      makeTask({ title: 'c', status: 'started', category: 'Work' }),
+      makeTask({ title: 'a', status: 'completed', category: 'Work', priority: 'high' }),
+      makeTask({ title: 'b', status: 'completed', category: 'Personal', priority: 'low' }),
+      makeTask({ title: 'c', status: 'started', category: 'Work', priority: 'high' }),
     ];
-    expect(filterAndSortTasks(tasks, { ...EMPTY_FILTERS, status: 'completed' }).map(t => t.title).sort())
-      .toEqual(['a', 'b']);
-    expect(filterAndSortTasks(tasks, { date: '', status: 'completed', category: 'Work' }).map(t => t.title))
-      .toEqual(['a']);
+    const titles = (f: Partial<typeof EMPTY_FILTERS>) =>
+      filterAndSortTasks(tasks, { ...EMPTY_FILTERS, ...f }).map(t => t.title).sort();
+    expect(titles({ status: 'completed' })).toEqual(['a', 'b']);
+    expect(titles({ status: 'completed', category: 'Work' })).toEqual(['a']);
+    expect(titles({ priority: 'high' })).toEqual(['a', 'c']);
+  });
+
+  it('searches title, description and subtasks, case-insensitively, all words required', () => {
+    const tasks = [
+      makeTask({ title: 'Buy milk' }),
+      makeTask({ title: 'Report', description: 'Quarterly SALES numbers' }),
+      makeTask({ title: 'Trip', subtasks: [{ id: 's', title: 'Book hotel', done: false }] }),
+    ];
+    const search = (q: string) => filterAndSortTasks(tasks, { ...EMPTY_FILTERS, search: q }).map(t => t.title);
+    expect(search('milk')).toEqual(['Buy milk']);
+    expect(search('sales')).toEqual(['Report']);
+    expect(search('hotel')).toEqual(['Trip']);
+    expect(search('quarterly numbers')).toEqual(['Report']);
+    expect(search('quarterly milk')).toEqual([]);
+    expect(search('   ')).toHaveLength(3);
   });
 
   it('returns all tasks sorted newest first with empty filters, without mutating input', () => {
@@ -63,5 +64,35 @@ describe('filterAndSortTasks', () => {
     const result = filterAndSortTasks(input, EMPTY_FILTERS);
     expect(result.map(t => t.title)).toEqual(['next', 'late', 'early', 'before']);
     expect(input).toEqual(all);
+  });
+});
+
+describe('hasActiveFilters', () => {
+  it('is false only when every filter is empty', () => {
+    expect(hasActiveFilters(EMPTY_FILTERS)).toBe(false);
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, search: 'x' })).toBe(true);
+  });
+});
+
+describe('sortForBoard', () => {
+  it('orders by priority, then soonest due date (none last), then newest', () => {
+    const tasks = [
+      makeTask({ title: 'low', priority: 'low' }),
+      makeTask({ title: 'high-nodue', priority: 'high', dueDate: null }),
+      makeTask({ title: 'high-later', priority: 'high', dueDate: '2026-12-01' }),
+      makeTask({ title: 'high-soon', priority: 'high', dueDate: '2026-11-20' }),
+      makeTask({ title: 'med-old', createdAt: 1 }),
+      makeTask({ title: 'med-new', createdAt: 2 }),
+    ];
+    expect(sortForBoard(tasks).map(t => t.title)).toEqual([
+      'high-soon', 'high-later', 'high-nodue', 'med-new', 'med-old', 'low',
+    ]);
+  });
+});
+
+describe('getAllCategories', () => {
+  it('merges defaults with custom categories, sorted and unique', () => {
+    const tasks = [makeTask({ category: 'Home' }), makeTask({ category: 'Work' }), makeTask({ category: 'Home' })];
+    expect(getAllCategories(tasks)).toEqual(['Home', 'Personal', 'Work']);
   });
 });

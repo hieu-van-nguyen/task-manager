@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { Task } from '../types/Task';
 import { useTasks } from './useTasks';
 import * as tasksService from '../services/tasks';
+import { makeTask } from '../testUtils';
 
 jest.mock('../firebase/config', () => ({ auth: {}, db: {} }));
 jest.mock('react-firebase-hooks/auth', () => ({
@@ -16,10 +17,7 @@ jest.mock('../services/tasks', () => ({
 
 const mockService = tasksService as jest.Mocked<typeof tasksService>;
 
-const task = (id: string): Task => ({
-  id, title: id, description: '', status: 'not started', category: 'Personal',
-  userId: 'user-1', createdAt: 1, updatedAt: null, completedAt: null,
-});
+const task = (id: string): Task => makeTask({ id, title: id });
 
 let emit: (tasks: Task[]) => void;
 let emitError: (err: Error) => void;

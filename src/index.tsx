@@ -4,6 +4,7 @@ import { CssBaseline, ThemeProvider } from '@mui/material';
 import App from './App';
 import { theme } from './theme';
 import reportWebVitals from './reportWebVitals';
+import { registerServiceWorker } from './serviceWorkerRegistration';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -16,6 +17,8 @@ root.render(
     </ThemeProvider>
   </React.StrictMode>
 );
+
+registerServiceWorker();
 
 // If you want to start measuring performance in your app, pass a function
 // to log results (for example: reportWebVitals(console.log))

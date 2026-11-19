@@ -61,6 +61,17 @@ export const useTasks = () => {
     [mutate]
   );
 
+  const bulkUpdateStatus = useCallback(
+    (ids: string[], status: TaskStatus) =>
+      mutate(() => tasksService.bulkUpdateStatus(ids, status), 'Failed to update tasks'),
+    [mutate]
+  );
+
+  const bulkRemove = useCallback(
+    (ids: string[]) => mutate(() => tasksService.bulkDelete(ids), 'Failed to delete tasks'),
+    [mutate]
+  );
+
   return {
     tasks,
     loading,
@@ -68,5 +79,7 @@ export const useTasks = () => {
     clearError: () => setError(null),
     updateStatus,
     remove,
+    bulkUpdateStatus,
+    bulkRemove,
   };
 };

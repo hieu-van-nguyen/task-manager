@@ -5,23 +5,29 @@ A personal task manager built with **React 19**, **TypeScript**, and **Firebase*
 ## Features
 
 - **Google sign-in** with Firebase Authentication
-- **Full task CRUD**: add tasks on a separate page, edit title, description and category in a dialog, delete with confirmation
-- **Status tracking**: `not started` → `started` → `completed`, changed inline from the task table
-- **Categories**: `Personal` or `Work`
-- **Filtering** by creation date, status, and category
-- **Sortable, paginated table** powered by MUI X Data Grid, newest tasks first, with quick search, column filters and CSV export
+- **Rich tasks**: title, description, category, priority (low / medium / high), due date and a subtask checklist
+- **Three views**:
+  - **Table** (MUI X Data Grid): sorting, column filters, CSV export, inline status changes, and **bulk actions** (select several tasks, then mark them completed / started or delete them)
+  - **Board**: a Kanban board with Not Started / Started / Completed columns and drag-and-drop between them
+  - **Dashboard**: open, due today, overdue and completed-this-week counts, plus breakdowns by status, priority and category
+- **Due dates** with overdue (red) and due-today (amber) highlighting
+- **Search** across titles, descriptions and subtasks, plus filters for created date, status, priority and category
+- **Custom categories**: pick an existing one or type a new one
 - **Real-time sync**: changes appear instantly across tabs and devices (Firestore listeners)
+- **Works offline and installs as an app**: tasks load and can be edited offline and sync when you reconnect
+- **Light and dark mode**, remembered per browser
 - **Timestamps** for created, last updated, and completed (server time)
-- **Responsive Material UI design** with a shared theme
+- **Responsive Material UI design**
 
 ## Tech Stack
 
 | Area | Tools |
 |---|---|
 | Frontend | React 19, TypeScript, React Router 7, Create React App (`react-scripts` 5) |
-| UI | MUI X Data Grid (with MUI / Emotion), plain CSS |
+| UI | Material UI 7 (light/dark theme), MUI X Data Grid, MUI Icons |
 | Backend | Firebase Authentication (Google provider), Cloud Firestore |
 | State | React hooks, [`react-firebase-hooks`](https://github.com/CSFrequency/react-firebase-hooks) |
+| Offline | Firestore persistent cache, service worker, web app manifest |
 | Hosting | Firebase Hosting |
 
 ## Getting Started
@@ -69,7 +75,11 @@ This file is **gitignored** and not included in the repo. You must create it you
 // src/firebase/config.ts
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: '...',
@@ -82,7 +92,10 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+// Persistent cache enables offline use (shared across tabs)
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+});
 ```
 
 ### 4. Run
@@ -113,33 +126,48 @@ npm run build
 firebase deploy --only hosting
 ```
 
+The production build includes a service worker (`public/service-worker.js`) that caches the app shell for offline use and lets browsers offer **Install app**. It is not active under `npm start`.
+
 Remember to add your hosting domain under **Authentication → Settings → Authorized domains** if it isn't already listed.
 
 ## Project Structure
 
 ```
 src/
-├── index.tsx                # MUI ThemeProvider + CssBaseline
-├── theme.ts                 # MUI theme (colors, typography, defaults)
-├── App.tsx                  # Auth gate + routes (/ and /add)
+├── index.tsx                  # Theme provider, service worker registration
+├── theme.ts                   # MUI light + dark color schemes
+├── App.tsx                    # Auth gate + routes (/ and /add)
 ├── components/
-│   ├── AuthWrapper.tsx      # Sign-in screen, app bar, page layout
-│   ├── TaskList.tsx         # Filters, Data Grid, status updates, delete
-│   ├── EditTaskModal.tsx    # Edit dialog (title, description, category)
-│   └── ConfirmDialog.tsx    # Reusable confirmation dialog
+│   ├── AuthWrapper.tsx        # Sign-in screen, app bar, page layout
+│   ├── ColorModeToggle.tsx    # Light/dark switch
+│   ├── TaskList.tsx           # Filters, view switch, dialogs
+│   ├── TaskTable.tsx          # Data Grid view + bulk actions
+│   ├── TaskBoard.tsx          # Kanban view with drag and drop
+│   ├── TaskDashboard.tsx      # Stats view
+│   ├── TaskFormFields.tsx     # Shared create/edit form fields
+│   ├── SubtaskEditor.tsx      # Checklist editor
+│   ├── TaskBadges.tsx         # Priority / due date / subtask chips
+│   ├── EditTaskModal.tsx      # Edit dialog
+│   └── ConfirmDialog.tsx      # Reusable confirmation dialog
 ├── pages/
-│   ├── TaskListPage.tsx     # Route "/"
-│   └── AddTaskPage.tsx      # Route "/add": create a task
+│   ├── TaskListPage.tsx       # Route "/"
+│   └── AddTaskPage.tsx        # Route "/add": create a task
 ├── hooks/
-│   └── useTasks.ts          # Loads the user's tasks, status/delete actions
+│   └── useTasks.ts            # Live task list + actions
 ├── services/
-│   └── tasks.ts             # All Firestore reads/writes for tasks
+│   └── tasks.ts               # All Firestore reads/writes for tasks
 ├── utils/
-│   └── filterTasks.ts       # Client-side filtering and sorting
+│   ├── filterTasks.ts         # Search, filters, sorting, categories
+│   ├── dates.ts               # Local-date helpers, due state
+│   ├── stats.ts               # Dashboard statistics
+│   └── taskDiff.ts            # Detects changed fields when editing
 ├── firebase/
-│   └── config.ts            # Firebase init (you create this; gitignored)
+│   └── config.ts              # Firebase init (you create this; gitignored)
 └── types/
-    └── Task.ts              # Task types, statuses, categories
+    └── Task.ts                # Task types, statuses, priorities
+public/
+├── manifest.json              # Installable app metadata
+└── service-worker.js          # Offline app shell cache
 ```
 
 ## Data Model
@@ -151,10 +179,13 @@ Tasks are stored in the Firestore collection `tasks`:
 | `title` | string | Task title |
 | `description` | string | Optional details |
 | `status` | string | `not started` \| `started` \| `completed` |
-| `category` | string | `Personal` \| `Work` |
+| `priority` | string | `low` \| `medium` \| `high` |
+| `category` | string | Any category name (defaults: `Personal`, `Work`) |
+| `dueDate` | string \| null | Due date as `YYYY-MM-DD` (local calendar date) |
+| `subtasks` | array | Checklist items: `{ id, title, done }` |
 | `userId` | string | Firebase Auth UID of the owner |
 | `createdAt` | Timestamp | Creation time (server time; older tasks store epoch milliseconds) |
 | `updatedAt` | Timestamp | Last time the task was edited or its status changed |
 | `completedAt` | Timestamp \| null | When the task was marked completed |
 
-Times are written with Firestore `serverTimestamp()`, so they don't depend on the user's device clock.
+Times are written with Firestore `serverTimestamp()`, so they don't depend on the user's device clock. Older tasks without the newer fields are read with sensible defaults (medium priority, no due date, no subtasks).

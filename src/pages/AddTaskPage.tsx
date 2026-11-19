@@ -1,16 +1,20 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { Alert, Box, Button, MenuItem, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Stack, Typography } from '@mui/material';
 import { auth } from '../firebase/config';
-import { TASK_CATEGORIES, TaskCategory } from '../types/Task';
+import { EMPTY_TASK_FIELDS, TaskFields } from '../types/Task';
 import { createTask, getErrorMessage } from '../services/tasks';
+import { useTasks } from '../hooks/useTasks';
+import { getAllCategories } from '../utils/filterTasks';
+import { TaskFormFields } from '../components/TaskFormFields';
 
 export const AddTaskPage: React.FC = () => {
   const [user] = useAuthState(auth);
   const navigate = useNavigate();
-  const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<TaskCategory>('Personal');
+  const { tasks } = useTasks(); // only for category suggestions
+  const categories = useMemo(() => getAllCategories(tasks), [tasks]);
+  const [fields, setFields] = useState<TaskFields>(EMPTY_TASK_FIELDS);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const userId = user?.uid;
@@ -18,7 +22,7 @@ export const AddTaskPage: React.FC = () => {
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!title.trim()) {
+    if (!fields.title.trim()) {
       setError('Title cannot be empty.');
       return;
     }
@@ -29,7 +33,7 @@ export const AddTaskPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      await createTask(userId, { title, description: '', category });
+      await createTask(userId, fields);
       navigate('/'); // Redirect back to the task list
     } catch (err) {
       console.error('Error adding task: ', err);
@@ -39,39 +43,24 @@ export const AddTaskPage: React.FC = () => {
   };
 
   return (
-    <Box component="form" onSubmit={handleAddTask} noValidate sx={{ maxWidth: 720 }}>
+    <Box component="form" onSubmit={handleAddTask} noValidate sx={{ maxWidth: 800 }}>
       <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
         Add New Task
       </Typography>
-      <Stack spacing={2}>
-        {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
-        <TextField
-          label="Task title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-          autoFocus
-          multiline
-          minRows={3}
-          fullWidth
-        />
-        <TextField
-          select
-          label="Category"
-          value={category}
-          onChange={(e) => setCategory(e.target.value as TaskCategory)}
-          sx={{ maxWidth: 240 }}
-        >
-          {TASK_CATEGORIES.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-        </TextField>
-        <Stack direction="row" spacing={1}>
-          <Button type="submit" variant="contained" disabled={isSubmitting}>
-            {isSubmitting ? 'Adding...' : 'Add Task'}
-          </Button>
-          <Button variant="outlined" color="secondary" onClick={() => navigate('/')} disabled={isSubmitting}>
-            Cancel
-          </Button>
-        </Stack>
+      {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>{error}</Alert>}
+      <TaskFormFields
+        value={fields}
+        onChange={(changes) => setFields(prev => ({ ...prev, ...changes }))}
+        categories={categories}
+        autoFocus
+      />
+      <Stack direction="row" spacing={1} sx={{ mt: 3 }}>
+        <Button type="submit" variant="contained" disabled={isSubmitting}>
+          {isSubmitting ? 'Adding...' : 'Add Task'}
+        </Button>
+        <Button variant="outlined" color="secondary" onClick={() => navigate('/')} disabled={isSubmitting}>
+          Cancel
+        </Button>
       </Stack>
     </Box>
   );

@@ -5,6 +5,7 @@ import {
   Alert, AppBar, Button, CircularProgress, Container, Paper, Stack, Toolbar, Typography,
 } from '@mui/material';
 import { auth } from '../firebase/config';
+import { ColorModeToggle } from './ColorModeToggle';
 
 const provider = new GoogleAuthProvider();
 
@@ -55,6 +56,7 @@ export const AuthWrapper: React.FC<{ children: React.ReactNode }> = ({ children 
           <Typography sx={{ display: { xs: 'none', sm: 'block' } }} noWrap>
             Welcome, {user.displayName}
           </Typography>
+          <ColorModeToggle />
           <Button color="inherit" variant="outlined" onClick={() => signOut(auth)}>
             Log Out
           </Button>
